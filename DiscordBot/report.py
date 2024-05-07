@@ -30,8 +30,15 @@ class Report:
         self.client = client
         self.message = None
         self.output = {
-            ""
-        }
+            "organization_name": None,
+            "category": None,
+            "context": None,
+            "location": None,
+            "suspect": None,
+            "urgent": None,
+            "size": None,
+            "post content": None
+        }   # output JSON sent to moderation team for further action
     
     async def handle_message(self, message):
         '''
