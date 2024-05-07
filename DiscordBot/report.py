@@ -1,12 +1,23 @@
 from enum import Enum, auto
 import discord
 import re
+from constants import *
 
 class State(Enum):
     REPORT_START = auto()
-    AWAITING_MESSAGE = auto()
+    AWAITING_MSG_LINK = auto()
     MESSAGE_IDENTIFIED = auto()
     REPORT_COMPLETE = auto()
+
+    # new states (one per node in tree traversal), generalized flow
+    AWAITING_GENERAL_ABUSE_TYPE = auto()
+
+    # new states for terrorism flow
+    AWAITING_GROUP_IDENTIFICATION = auto()
+    AWAITING_POST_CATEGORY = auto()
+    AWAITING_CONTEXT_MSG = auto()
+    AWAITING_THREAT_LEVEL = auto()
+
 
 class Report:
     START_KEYWORD = "report"
@@ -30,14 +41,34 @@ class Report:
             return ["Report cancelled."]
         
         if self.state == State.REPORT_START:
-            reply =  "Thank you for starting the reporting process. "
-            reply += "Say `help` at any time for more information.\n\n"
-            reply += "Please copy paste the link to the message you want to report.\n"
-            reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."
-            self.state = State.AWAITING_MESSAGE
+            reply = "Thank you for beginning your report! Please answer the following questions regarding the nature of the content you are reporting.\n\n"
+            reply += "What is the nature of the content that you are attempting to report? Select your choice from the options below.\n\n"
+            reply += "Online harrassment/cyberbullying (1)\n"
+            reply += "Nude/explicit photos of unconsenting parties, including minors (2)\n"
+            reply += "Online terrorist recruitment (3)\n"
+            reply += "Other (4)\n"
+
+            self.state = State.AWAITING_GENERAL_ABUSE_TYPE
             return [reply]
         
-        if self.state == State.AWAITING_MESSAGE:
+        if self.state == State.AWAITING_GENERAL_ABUSE_TYPE:
+            
+            NAVIGATE_TERROR_FLOW = set(["3", "(3)"])   # user choosing to report terror case
+            NAVIGATE_CYBER_EXPLICIT_FLOWS = set(["1", "(1)", "2", "(2)"])   # user chose option 1 or 2
+            NAVIGATE_OTHER_FLOW = set(["4", "(4)"])   # they chose "Other"
+
+            if message in NAVIGATE_TERROR_FLOW:  # user choosing to report terror case
+                pass
+            elif message in NAVIGATE_CYBER_EXPLICIT_FLOWS:  #  user reporting cyber harrassment/explicit content
+                pass 
+            elif NAVIGATE_OTHER_FLOW:  # User reporting "Other" category
+                pass 
+            else:    # invalid input
+                pass 
+            
+
+        
+        if self.state == State.AWAITING_MSG_LINK:
             # Parse out the three ID strings from the message link
             m = re.search('/(\d+)/(\d+)/(\d+)', message.content)
             if not m:
@@ -66,7 +97,3 @@ class Report:
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
     
-
-
-    
-
