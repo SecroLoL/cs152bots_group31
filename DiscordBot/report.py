@@ -61,14 +61,32 @@ class Report:
             NAVIGATE_CYBER_EXPLICIT_FLOWS = set(["1", "(1)", "2", "(2)"])   # user chose option 1 or 2
             NAVIGATE_OTHER_FLOW = set(["4", "(4)"])   # they chose "Other"
 
-            if message in NAVIGATE_TERROR_FLOW:  # user choosing to report terror case
-                pass
-            elif message in NAVIGATE_CYBER_EXPLICIT_FLOWS:  #  user reporting cyber harrassment/explicit content
-                pass 
-            elif NAVIGATE_OTHER_FLOW:  # User reporting "Other" category
-                pass 
+            reply = ""
+            if message.content in NAVIGATE_TERROR_FLOW:  # user choosing to report terror case
+                reply += "Choice confirmed.\n\n"
+                reply += "Do you know the group the uploader of this content may be associated with?\n"
+                reply += "If so, please provide the name of the group in the form of ('known: group name', e.g. 'known: ISIS').\n\n"
+                reply += "If not, specify whether the group is located in the U.S. ('USA'), Abroad/International ('Intl'), or if you're unsure, write 'unknown'."
+                # TODO update the output state obj with some additional fields here
+                # The response should be one of 'known: ___', 'USA', 'Intl', 'unknown'.
+                self.state = State.AWAITING_GROUP_IDENTIFICATION
+            elif message.content in NAVIGATE_CYBER_EXPLICIT_FLOWS:  #  user reporting cyber harrassment/explicit content
+                reply += "Choice confirmed.\n"
+                reply += "Please provide additional context into the abuse you are reporting. Our moderation team will review your case and contact you for followup.\n"
+                
+                reply += "You may also provide a link to the Discord message content you are reporting so that our moderation team can directly review the post."
+                self.state = State.AWAITING_GENERAL_ADDNTL_CONTEXT
+            elif message.content in NAVIGATE_OTHER_FLOW:  # User reporting "Other" category
+                reply += "We do not currently offer support for other categories of potential abuse.\n"
+                reply += "However, we still encourage you to submit information regarding the offensive content.\n"
+                reply += "Please provide any context to the abuse you are reporting. Our moderation team will contact you if future efforts are made into your case. "
+                reply += "You may also provide a link to the Discord message content you are reporting so that our moderation team can directly review the post."
+
+                self.state = State.AWAITING_GENERAL_ADDNTL_CONTEXT
             else:    # invalid input
-                pass 
+                reply += f"Invalid input. Please choose one of the following options: `1`, `2`, `3`, `4`.\n"
+                reply += f"Your input: `{message.content}`"
+                # user remains in this part of the decision tree until a valid option is selected
             
 
         
