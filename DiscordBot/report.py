@@ -88,7 +88,23 @@ class Report:
                 reply += f"Your input: `{message.content}`"
                 # user remains in this part of the decision tree until a valid option is selected
             
+            return [reply]
+        
+        if self.state == State.AWAITING_GENERAL_ADDNTL_CONTEXT:
+            # TODO: ask for some additional context to the problem
+            # We don't have to save this into the state of the Report output because we have no need
+            # to implementation any backend functionality for non-terrorism reports. We can just
+            # end this flow on the user end.
+            reply = ""
+            reply += f"WARNING: This section hasn't been implemented! "
 
+            return [reply] 
+
+        if self.state == State.AWAITING_GROUP_IDENTIFICATION:
+            # TODO: handle next terror flow
+            reply = ""
+            reply += f"Warning: This terrorism section hasn't been finished."
+            return [reply]
         
         if self.state == State.AWAITING_MSG_LINK:
             # Parse out the three ID strings from the message link
