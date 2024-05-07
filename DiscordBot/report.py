@@ -98,19 +98,42 @@ class Report:
             return [reply]
         
         if self.state == State.AWAITING_GENERAL_ADDNTL_CONTEXT:
-            # TODO: ask for some additional context to the problem
             # We don't have to save this into the state of the Report output because we have no need
             # to implementation any backend functionality for non-terrorism reports. We can just
             # end this flow on the user end.
-            reply = ""
-            reply += f"WARNING: This section hasn't been implemented! "
-
+            reply = "Thank you for submitting your information. Our moderation team will review your report and contact you if further action is required.\n\n"
+            reply += "We appreciate your time and effort to help us moderate platform content!"
             return [reply] 
 
         if self.state == State.AWAITING_GROUP_IDENTIFICATION:
-            # TODO: handle next terror flow
             reply = ""
-            reply += f"Warning: This terrorism section hasn't been finished."
+            response = message.content.lower()
+            unknown_options = set(["usa", "intl", "unknown"])
+            
+            if response.startswith("known"):  # user knew the group
+                response_components = response.split(":")
+                group_name = response_components[-1].strip()
+
+                self.output["organization"] = group_name
+            
+            elif response in unknown_options:   #  user didn't know the group
+                self.output["organization"] = response
+
+            else:   # invalid input
+                reply += f"Invalid input. If you are familiar with the group, please type `known: [group name]`, e.g. `known: ISIS`.\n "
+                reply += f"If you do not know the group, but you know they are based in the United States, type 'USA'. If they are based internationally, type 'Intl'.\n"
+                reply += f"Otherwise, if you have no information about the organization, type 'Unknown'."
+            
+            if self.output.get("organization") is not None:  # we can proceed knowing the input was valid
+                reply += f"What kind of terrorist recruitment content are you reporting? Choose from one of the following:\n\n"
+                reply += "Graphic content/Disturbing Imagery (1)\n"
+                reply += "Logistical coordination (2)\n"
+                reply += "Propaganda promoting the terrorist organization and/or its members (3)\n"
+                reply += "Active threat of impending violence (4)\n"
+                reply += "Other (5)\n"
+
+                self.state = State.AWAITING_POST_CATEGORY
+
             return [reply]
         
         if self.state == State.AWAITING_MSG_LINK:
