@@ -11,6 +11,7 @@ class State(Enum):
 
     # new states (one per node in tree traversal), generalized flow
     AWAITING_GENERAL_ABUSE_TYPE = auto()
+    AWAITING_GENERAL_ADDNTL_CONTEXT = auto()
 
     # new states for terrorism flow
     AWAITING_GROUP_IDENTIFICATION = auto()
@@ -28,6 +29,9 @@ class Report:
         self.state = State.REPORT_START
         self.client = client
         self.message = None
+        self.output = {
+            ""
+        }
     
     async def handle_message(self, message):
         '''
