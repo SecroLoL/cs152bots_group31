@@ -18,6 +18,9 @@ class State(Enum):
     AWAITING_POST_CATEGORY = auto()
     AWAITING_CONTEXT_MSG = auto()
     AWAITING_THREAT_LEVEL = auto()
+    AWAITING_GROUPLOC = auto()
+    AWAITING_SUBMISSION = auto()
+    AWAITING_LOOP = auto()
 
 
 class Report:
@@ -74,7 +77,7 @@ class Report:
                 reply += "Do you know the group the uploader of this content may be associated with?\n"
                 reply += "If so, please provide the name of the group in the form of ('known: group name', e.g. 'known: ISIS').\n\n"
                 reply += "If not, specify whether the group is located in the U.S. ('USA'), Abroad/International ('Intl'), or if you're unsure, write 'unknown'."
-                # TODO update the output state obj with some additional fields here
+                
                 # The response should be one of 'known: ___', 'USA', 'Intl', 'unknown'.
                 self.state = State.AWAITING_GROUP_IDENTIFICATION
             elif message.content in NAVIGATE_CYBER_EXPLICIT_FLOWS:  #  user reporting cyber harrassment/explicit content
@@ -89,7 +92,7 @@ class Report:
                 reply += "Please provide any context to the abuse you are reporting. Our moderation team will contact you if future efforts are made into your case. "
                 reply += "You may also provide a link to the Discord message content you are reporting so that our moderation team can directly review the post."
 
-                self.state = State.AWAITING_GENERAL_ADDNTL_CONTEXT
+                self.state = State.AWAITING_SUBMISSION
             else:    # invalid input
                 reply += f"Invalid input. Please choose one of the following options: `1`, `2`, `3`, `4`.\n"
                 reply += f"Your input: `{message.content}`"
@@ -213,31 +216,73 @@ class Report:
             return [reply]  
 
         if self.state == State.AWAITING_THREAT_LEVEL:
-            # TODO: fill in this section!
-            pass 
+            response = message.content.strip().lower()
+            reply = ""
 
+            if response == "y" or response == "yes":  # urgent threat
+                self.output["urgent"] = True 
+                reply += "If you know where the target location and how many perpetrators are involved, please include these details.\n"
+                reply += "Format your response in the form (location, group size). If you don't know the answer for one of these fields, write 'unknown'.\n"
 
-        if self.state == State.AWAITING_MSG_LINK:
-            # Parse out the three ID strings from the message link
-            m = re.search('/(\d+)/(\d+)/(\d+)', message.content)
-            if not m:
-                return ["I'm sorry, I couldn't read that link. Please try again or say `cancel` to cancel."]
-            guild = self.client.get_guild(int(m.group(1)))
-            if not guild:
-                return ["I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again."]
-            channel = guild.get_channel(int(m.group(2)))
-            if not channel:
-                return ["It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel."]
-            try:
-                message = await channel.fetch_message(int(m.group(3)))
-            except discord.errors.NotFound:
-                return ["It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."]
+                self.state = State.AWAITING_GROUPLOC
+                # TODO Then, go to the redo state
+                # We also need a submit state.
+            elif response == "n" or response == "no":  # not urgent
+                self.output["urgent"] = False
+                reply += "Thank you for response on this post. Do you have any other posts from this user you would like to report? (Y / N)\n"
 
-            # Here we've found the message - it's up to you to decide what to do next!
-            self.state = State.MESSAGE_IDENTIFIED
-            return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
-                    "This is all I know how to do right now - it's up to you to build out the rest of my reporting flow!"]
+                self.state = State.AWAITING_LOOP
+            else:  # invalid response
+                reply += "Invalid response. Please try again using 'Y' or 'N' to answer the previous question.\n"
+
+            return [reply]
+
+        if self.state == State.AWAITING_GROUPLOC:
+            reply = ""
+            response = message.content.strip().lower()  # should be of form (location, size)
+            
+            # TODO: input validation here
+
+            # Assume that input is valid form of (location, size)
+            split_input = response.split(",")
+            location, size = split_input[0][1:], split_input[1][1 : -1]
+
+            self.output["location"] = location
+            self.output["size"] = int(size)
+
+            reply += "Thank you for response on this post. Do you have any other posts from this user you would like to report? (Y / N)\n"
+
+            self.state = State.AWAITING_LOOP
+            return [reply]
         
+        if self.state == State.AWAITING_LOOP:
+            reply = ""
+            response = message.content.strip().lower()  # expecting 'y' or 'n'
+            valid_responses = set(["y", "n", "yes", "no"])
+            if response not in valid_responses:
+                reply += "Invalid response. Please try again (Y/N)."
+                return [reply]
+            if response == "y" or response == "yes":
+
+                # recycle loop for category
+                reply += f"What kind of terrorist recruitment content are you reporting? Choose from one of the following:\n\n"
+                reply += "Graphic content/Disturbing Imagery (1)\n"
+                reply += "Logistical coordination (2)\n"
+                reply += "Propaganda promoting the terrorist organization and/or its members (3)\n"
+                reply += "Active threat of impending violence (4)\n"
+                reply += "Other (5)\n"
+
+                self.state = State.AWAITING_POST_CATEGORY 
+            elif response == "n" or response == "no":
+                reply += "Thank you for submitting your report!"
+                self.state = State.AWAITING_SUBMISSION
+
+            return [reply]
+
+        if self.state == State.AWAITING_SUBMISSION:
+            # End the form
+            self.state = State.REPORT_COMPLETE
+
         if self.state == State.MESSAGE_IDENTIFIED:
             return ["<insert rest of reporting flow here>"]
 
