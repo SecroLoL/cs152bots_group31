@@ -41,8 +41,25 @@ class Report:
             "urgent": None,
             "size": None,
             "post_content": None
-        }   # output JSON sent to moderation team for further action
+        }   # current output being built
+
+        self.final_outputs = []  # stores all outputs from user
     
+    def generate_template_output(self):
+
+        # returns a blank template for json output
+        output = {
+            "organization_name": None,
+            "category": None,
+            "context": None,
+            "location": None,
+            "suspect": None,
+            "urgent": None,
+            "size": None,
+            "post_content": None
+        }
+        return output
+
     async def handle_message(self, message):
         '''
         This function makes up the meat of the user-side reporting flow. It defines how we transition between states and what 
@@ -54,6 +71,9 @@ class Report:
             self.state = State.REPORT_COMPLETE
             return ["Report cancelled."]
         
+        if message.content == "DEBUG":
+            print(self.get_all_outputs())
+
         if self.state == State.REPORT_START:
             reply = "Thank you for beginning your report! Please answer the following questions regarding the nature of the content you are reporting.\n\n"
             reply += "What is the nature of the content that you are attempting to report? Select your choice from the options below.\n\n"
@@ -117,17 +137,17 @@ class Report:
                 response_components = response.split(":")
                 group_name = response_components[-1].strip()
 
-                self.output["organization"] = group_name
+                self.output["organization_name"] = group_name
             
             elif response in unknown_options:   #  user didn't know the group
-                self.output["organization"] = response
+                self.output["organization_name"] = response
 
             else:   # invalid input
                 reply += f"Invalid input. If you are familiar with the group, please type `known: [group name]`, e.g. `known: ISIS`.\n "
                 reply += f"If you do not know the group, but you know they are based in the United States, type 'USA'. If they are based internationally, type 'Intl'.\n"
                 reply += f"Otherwise, if you have no information about the organization, type 'Unknown'."
             
-            if self.output.get("organization") is not None:  # we can proceed knowing the input was valid
+            if self.output.get("organization_name") is not None:  # we can proceed knowing the input was valid
                 reply += f"What kind of terrorist recruitment content are you reporting? Choose from one of the following:\n\n"
                 reply += "Graphic content/Disturbing Imagery (1)\n"
                 reply += "Logistical coordination (2)\n"
@@ -263,6 +283,13 @@ class Report:
                 reply += "Invalid response. Please try again (Y/N)."
                 return [reply]
             if response == "y" or response == "yes":
+                
+                self.final_outputs.append(self.output)
+
+                # Reset template to base form for next submission
+                org_name = self.output.get("organization_name")
+                self.output = self.generate_template_output()
+                self.output["organization_name"] = org_name
 
                 # recycle loop for category
                 reply += f"What kind of terrorist recruitment content are you reporting? Choose from one of the following:\n\n"
@@ -275,6 +302,13 @@ class Report:
                 self.state = State.AWAITING_POST_CATEGORY 
             elif response == "n" or response == "no":
                 reply += "Thank you for submitting your report!"
+
+                self.final_outputs.append(self.output)
+                # Reset template to base form for next submission
+                org_name = self.output.get("organization_name")
+                self.output = self.generate_template_output()
+                self.output["organization_name"] = org_name
+                
                 self.state = State.AWAITING_SUBMISSION
 
             return [reply]
@@ -287,6 +321,9 @@ class Report:
             return ["<insert rest of reporting flow here>"]
 
         return []
+
+    def get_all_outputs(self):
+        return self.final_outputs
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
