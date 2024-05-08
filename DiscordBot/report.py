@@ -135,7 +135,64 @@ class Report:
                 self.state = State.AWAITING_POST_CATEGORY
 
             return [reply]
-        
+
+        if self.state == State.AWAITING_POST_CATEGORY:
+            reply = ""
+            response = message.content.strip().lower()  # lowercase and remove whitespace
+            VALID_REPLIES = set([
+                "1", "(1)", "2", "(2)", "3", "(3)", "4", "(4)", "5", "(5)"
+            ])
+
+            if response not in VALID_REPLIES:
+                reply += "Invalid response. Try again.\n\n"
+                reply += f"What kind of terrorist recruitment content are you reporting? Choose from one of the following:\n\n"
+                reply += "Graphic content/Disturbing Imagery (1)\n"
+                reply += "Logistical coordination (2)\n"
+                reply += "Propaganda promoting the terrorist organization and/or its members (3)\n"
+                reply += "Active threat of impending violence (4)\n"
+                reply += "Other (5)\n"
+
+                return [reply]
+            # User gave a valid response
+
+            response_to_category = {
+                "1": "imagery",
+                "(1)": "imagery",
+                "2": "coordination",
+                "(2)": "coordination",
+                "3": "propaganda",
+                "(3)": "propaganda",
+                "4": "threat",
+                "(4)": "threat",
+                "5": "other",
+                "(5)": "other"
+            }
+
+            self.output["category"] = response_to_category.get(response)
+            if self.output["category"] is None:
+                raise ValueError(f"Couldn't process response from the user into category type: {response}")
+            
+            # Proceed to next state by asking question about post context
+
+            reply += "Please provide any additional context/information about the post you are reporting.\n"
+            reply += "Format your response with a link to the message you are reporting, followed by any information you would like the moderation team to consider while reviewing your report.\n"
+            self.state = State.AWAITING_CONTEXT_MSG
+            return [reply]
+
+        if self.state == State.AWAITING_CONTEXT_MSG:
+
+            context_response = message.content.strip().lower()
+            reply = ""
+
+            reply += context_response
+
+            return [reply]  # TODO: fill in this section!
+
+        if self.state == State.AWAITING_THREAT_LEVEL:
+            # TODO: fill in this section!
+            pass 
+
+
         if self.state == State.AWAITING_MSG_LINK:
             # Parse out the three ID strings from the message link
             m = re.search('/(\d+)/(\d+)/(\d+)', message.content)
