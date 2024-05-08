@@ -37,7 +37,7 @@ class Report:
             "suspect": None,
             "urgent": None,
             "size": None,
-            "post content": None
+            "post_content": None
         }   # output JSON sent to moderation team for further action
     
     async def handle_message(self, message):
@@ -180,13 +180,37 @@ class Report:
             return [reply]
 
         if self.state == State.AWAITING_CONTEXT_MSG:
-
-            context_response = message.content.strip().lower()
             reply = ""
+            context_response = message.content.strip().lower()
+            # raw context
+            self.output["context"] = context_response  
 
-            reply += context_response
+            # try getting the link if it exists from the content
+            # Parse out the three ID strings from the message link
+            m = re.search('/(\d+)/(\d+)/(\d+)', message.content)
+            if not m:
+                reply += f"ERROR: Could not find linked content inside of your response. Please start with your link and try again.\n"
+            
+            guild = self.client.get_guild(int(m.group(1)))
+            if not guild:
+                reply += "As a bot, I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again.\n"
+            channel = guild.get_channel(int(m.group(2)))
+            if not channel:
+                reply += "It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel.\n"
+            try:
+                message = await channel.fetch_message(int(m.group(3)))
 
-            return [reply]  # TODO: fill in this section!
+                self.output["post_content"] = message.content
+                self.output["suspect"] = message.author.name
+
+            except discord.errors.NotFound:
+                reply += "It seems this message was deleted or never existed. Please try again or say `cancel` to cancel.\n"
+            
+            reply += "Response received and confirmed!" + "\n\n\n"
+            reply += "Do you believe the reported content poses an active/urgent threat to public safety? (Y/N)\n"
+            
+            self.state = State.AWAITING_THREAT_LEVEL  # transition to next state, wait for user to respond
+            return [reply]  
 
         if self.state == State.AWAITING_THREAT_LEVEL:
             # TODO: fill in this section!
