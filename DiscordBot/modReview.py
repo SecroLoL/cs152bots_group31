@@ -64,7 +64,7 @@ class ModReview:
                 return ["This has been flagged as an immediate threat. A template for reporting to the FBI will be provided. Do you want to proceed with reporting to authorities? (yes/no)"]
             else:
                 self.state = State.DETERMINE_SUSPENSION_DURATION
-                return ["No immediate threat detected. Please determine the appropriate suspension duration: (1) 1 day, (2) 7 days, (3) 30 days, (4) Indefinite"]
+                return ["No immediate threat detected. Please determine the appropriate suspension duration: (1) 1 day, (2) 7 days, (3) 30 days, (4) Indefinite, (5) Suspension not required."]
 
         if self.state == State.DETERMINE_SUSPENSION_DURATION:
             option = message.content
@@ -76,6 +76,8 @@ class ModReview:
                 return ["User suspended for 30 days.", self.state_to_final_decision()]
             elif option == "4":
                 return ["User suspended indefinitely.", self.state_to_final_decision()]
+            elif option == "5":
+                return ["No suspension required.", self.state_to_final_decision()]
             else:
                 return ["Invalid option. Please choose from (1) 1 day, (2) 7 days, (3) 30 days, (4) Indefinite"]
 
