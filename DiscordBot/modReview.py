@@ -23,32 +23,40 @@ class ModReview:
         self.state = State.REVIEW_START
         self.client = client
         self.message = None
-        self.data = {}
+        self.report_data = None
 
     async def handle_message(self, message):
         if message.content == self.CANCEL_KEYWORD:
-            return ["Review process cancelled.", self.state_to_review_complete()]
-        
-        if self.state == State.REVIEW_START:
-            reply = "Welcome to the moderation review system. "
-            reply += "You can type `help` anytime for assistance.\n\n"
-            reply += "Kindly provide the URL of the Discord message you wish to review."
-            self.state = State.REPORT_LINK
-            return [reply]
+            return ["Review process has been terminated.", self.state_to_review_complete()]
 
-        if self.state == State.REPORT_LINK:
-            m = re.search('/(\d+)/(\d+)/(\d+)', message.content)
-            if not m:
-                return ["Unable to locate the message from the provided link. Please verify and try again or type `cancel` to abort."]
-            guild = self.client.get_guild(int(m.group(1)))
-            channel = guild.get_channel(int(m.group(2)))
-            try:
-                fetched_message = await channel.fetch_message(int(m.group(3)))
-                self.data["report_content"] = fetched_message.content
-                self.state = State.CHECK_URGENCY
-                return ["Message successfully retrieved. Does this report represent an immediate threat? Please respond with 'yes' or 'no'."]
-            except discord.errors.NotFound:
-                return ["The message specified could not be found. Please check the link and try again, or type `cancel` to abort."]
+        if message.content.startswith(self.START_KEYWORD):
+            if not self.client.to_be_reviewed:
+                return ["No more reports to review.", self.state_to_review_complete()]
+
+            self.report_data = self.client.to_be_reviewed.pop(0)
+            post_content = self.report_data["post_content"]
+            organization_name = self.report_data["organization_name"]
+            category = self.report_data["category"]
+            context = self.report_data["context"]
+            location = self.report_data["location"]
+            suspect = self.report_data["suspect"]
+            urgent = "Yes" if self.report_data["urgent"] else "No"
+            size = self.report_data["size"]
+
+            formatted_message = (
+                f"**Reviewing Report:**\n\n"
+                f"**Organization:** {organization_name or 'Unknown'}\n"
+                f"**Category:** {category or 'Not Specified'}\n"
+                f"**Context:** {context or 'No additional context provided'}\n"
+                f"**Location:** {location or 'Location not specified'}\n"
+                f"**Suspect:** {suspect or 'Suspect information not provided'}\n"
+                f"**Urgency:** {urgent}\n"
+                f"**Group Size:** {size or 'Not specified'}\n\n"
+                f"**Content:**\n{post_content or 'No content provided'}\n\n"
+                f"Does this report represent an immediate threat? (yes/no)"
+            )
+            self.state = State.CHECK_URGENCY
+            return [formatted_message]
 
         if self.state == State.CHECK_URGENCY:
             if message.content.lower() == "yes":
@@ -81,7 +89,13 @@ class ModReview:
             return ["Report has been submitted to authorities. Thank you for your diligence.", self.state_to_review_complete()]
 
         if self.state == State.FINAL_DECISION:
-            return ["Final review decisions have been made. The review process is now complete.", self.state_to_review_complete()]
+            reply = ["Final review decisions have been made. The review process is now complete."]
+            if self.client.to_be_reviewed:
+                reply.append("Do you want to review the next user report? (yes/no)")
+                self.state = State.REVIEW_START  # Reset to start to handle the next report
+            else:
+                reply.append(self.state_to_review_complete())
+            return reply
 
     def state_to_review_complete(self):
         self.state = State.REVIEW_COMPLETE
