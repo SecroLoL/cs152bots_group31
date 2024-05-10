@@ -69,7 +69,7 @@ class Report:
 
         if message.content == self.CANCEL_KEYWORD:
             self.state = State.REPORT_COMPLETE
-            return ["Report cancelled."]
+            return ["Report cancelled."], None
         
         if message.content == "DEBUG":
             print(self.get_all_outputs())
@@ -83,7 +83,7 @@ class Report:
             reply += "Other (4)\n"
 
             self.state = State.AWAITING_GENERAL_ABUSE_TYPE
-            return [reply]
+            return [reply], None
         
         if self.state == State.AWAITING_GENERAL_ABUSE_TYPE:
             
@@ -118,7 +118,7 @@ class Report:
                 reply += f"Your input: `{message.content}`"
                 # user remains in this part of the decision tree until a valid option is selected
             
-            return [reply]
+            return [reply], None
         
         if self.state == State.AWAITING_GENERAL_ADDNTL_CONTEXT:
             # We don't have to save this into the state of the Report output because we have no need
@@ -126,7 +126,7 @@ class Report:
             # end this flow on the user end.
             reply = "Thank you for submitting your information. Our moderation team will review your report and contact you if further action is required.\n\n"
             reply += "We appreciate your time and effort to help us moderate platform content!"
-            return [reply] 
+            return [reply], None
 
         if self.state == State.AWAITING_GROUP_IDENTIFICATION:
             reply = ""
@@ -157,7 +157,7 @@ class Report:
 
                 self.state = State.AWAITING_POST_CATEGORY
 
-            return [reply]
+            return [reply], None
 
         if self.state == State.AWAITING_POST_CATEGORY:
             reply = ""
@@ -175,7 +175,7 @@ class Report:
                 reply += "Active threat of impending violence (4)\n"
                 reply += "Other (5)\n"
 
-                return [reply]
+                return [reply], None
             # User gave a valid response
 
             response_to_category = {
@@ -200,7 +200,7 @@ class Report:
             reply += "Please provide any additional context/information about the post you are reporting.\n"
             reply += "Format your response with a link to the message you are reporting, followed by any information you would like the moderation team to consider while reviewing your report.\n"
             self.state = State.AWAITING_CONTEXT_MSG
-            return [reply]
+            return [reply], None
 
         if self.state == State.AWAITING_CONTEXT_MSG:
             reply = ""
@@ -233,7 +233,7 @@ class Report:
             reply += "Do you believe the reported content poses an active/urgent threat to public safety? (Y/N)\n"
             
             self.state = State.AWAITING_THREAT_LEVEL  # transition to next state, wait for user to respond
-            return [reply]  
+            return [reply], None  
 
         if self.state == State.AWAITING_THREAT_LEVEL:
             response = message.content.strip().lower()
@@ -255,7 +255,7 @@ class Report:
             else:  # invalid response
                 reply += "Invalid response. Please try again using 'Y' or 'N' to answer the previous question.\n"
 
-            return [reply]
+            return [reply], None
 
         if self.state == State.AWAITING_GROUPLOC:
             reply = ""
@@ -273,7 +273,7 @@ class Report:
             reply += "Thank you for response on this post. Do you have any other posts from this user you would like to report? (Y / N)\n"
 
             self.state = State.AWAITING_LOOP
-            return [reply]
+            return [reply], None
         
         if self.state == State.AWAITING_LOOP:
             reply = ""
@@ -281,7 +281,7 @@ class Report:
             valid_responses = set(["y", "n", "yes", "no"])
             if response not in valid_responses:
                 reply += "Invalid response. Please try again (Y/N)."
-                return [reply]
+                return [reply], None
             if response == "y" or response == "yes":
                 
                 self.final_outputs.append(self.output)
@@ -305,22 +305,25 @@ class Report:
 
                 self.final_outputs.append(self.output)
                 # Reset template to base form for next submission
-                org_name = self.output.get("organization_name")
+                org_name = self.output.get("organization_name")     
                 self.output = self.generate_template_output()
                 self.output["organization_name"] = org_name
                 
                 self.state = State.AWAITING_SUBMISSION
 
-            return [reply]
+                return [reply], self.final_outputs
+
+            return [reply], None
 
         if self.state == State.AWAITING_SUBMISSION:
             # End the form
             self.state = State.REPORT_COMPLETE
+            return [], self.final_outputs
 
         if self.state == State.MESSAGE_IDENTIFIED:
-            return ["<insert rest of reporting flow here>"]
+            return ["<insert rest of reporting flow here>"], None
 
-        return []
+        return [], None
 
     def get_all_outputs(self):
         return self.final_outputs
