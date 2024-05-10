@@ -117,12 +117,12 @@ class ModBot(discord.Client):
             if author_id not in self.reviews:
                 self.reviews[author_id] = ModReview(self)
             
-            responses = await self.reviews(author_id).handle_message(message)
+            responses = await self.reviews[author_id].handle_message(message)
 
             for r in responses:
                 await message.channel.send(r)
 
-            if self.reports(author_id).report_complete():
+            if self.reports[author_id].report_complete():
                 self.reviews.pop(author_id)
 
 
