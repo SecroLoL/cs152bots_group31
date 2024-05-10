@@ -81,6 +81,7 @@ class ModReview:
 
         if self.state == State.REPORT_AUTHORITIES:
             if message.content.lower() == "yes":
+                self.state = State.SUBMIT_REPORT
                 return ["Submitting report to authorities.", self.state_to_submit_report()]
             else:
                 return ["No action to report to authorities.", self.state_to_review_complete()]
@@ -103,7 +104,6 @@ class ModReview:
 
     def state_to_submit_report(self):
         self.state = State.SUBMIT_REPORT
-        return "Would you like to submit the report to authorities? (yes/no)"
 
     def state_to_final_decision(self):
         self.state = State.FINAL_DECISION
