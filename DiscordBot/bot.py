@@ -7,6 +7,7 @@ import logging
 import re
 import requests
 from report import Report
+from modReview import ModReview
 import pdb
 
 # Set up logging to the console
@@ -34,6 +35,7 @@ class ModBot(discord.Client):
         self.group_num = None
         self.mod_channels = {} # Map from guild to the mod channel id for that guild
         self.reports = {} # Map from user IDs to the state of their report
+        self.reviews = {} 
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -100,6 +102,30 @@ class ModBot(discord.Client):
             self.reports.pop(author_id)
 
     async def handle_channel_message(self, message):
+        if message.channel.name == f'group-{self.group_num}-mod':
+            if message.content == ModReview.HELP_KEYWORD:
+                reply += "To initiate the reporting proccess, please type 'review' "
+                reply += "To stop the reporting process, please type 'cancel'"
+                await message.channel.send(reply)
+            
+            author_id = message.author.id
+            responses = []
+
+            if author_id not in self.reviews and not message.content.startswith(ModReview.START_KEYWORD):
+                return
+
+            if author_id not in self.reviews:
+                self.reviews[author_id] = ModReview(self)
+            
+            responses = await self.reviews(author_id).handle_message(message)
+
+            for r in responses:
+                await message.channel.send(r)
+
+            if self.reports(author_id).report_complete():
+                self.reviews.pop(author_id)
+
+
         # Only handle messages sent in the "group-#" channel
         if not message.channel.name == f'group-{self.group_num}':
             return
