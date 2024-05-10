@@ -37,6 +37,8 @@ class ModBot(discord.Client):
         self.reports = {} # Map from user IDs to the state of their report
         self.reviews = {} 
 
+        self.to_be_reviewed = []
+
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
         for guild in self.guilds:
@@ -93,7 +95,10 @@ class ModBot(discord.Client):
             self.reports[author_id] = Report(self)
 
         # Let the report class handle this message; forward all the messages it returns to uss
-        responses = await self.reports[author_id].handle_message(message)
+        responses, final_outputs = await self.reports[author_id].handle_message(message)
+        if final_outputs is not None:
+            for out in final_outputs:
+                self.to_be_reviewed.append(out)
         for r in responses:
             await message.channel.send(r)
 
@@ -117,7 +122,7 @@ class ModBot(discord.Client):
             if author_id not in self.reviews:
                 self.reviews[author_id] = ModReview(self)
             
-            responses = await self.reviews[author_id].handle_message(message)
+            responses, final_outputs = await self.reviews[author_id].handle_message(message)
 
             for r in responses:
                 await message.channel.send(r)
