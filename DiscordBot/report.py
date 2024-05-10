@@ -261,9 +261,9 @@ class Report:
             reply = ""
             response = message.content.strip().lower()  # should be of form (location, size)
             
-            # TODO: input validation here
-            response_pattern = r"\(\s*[^,]+\s*, \s*\d+\s*\)"
-            if not re.match(response_pattern, response) and response != "unknown":
+            # input validation here
+            response_pattern = r"\(\s*[^,]+\s*, \s*\d+\s*\)|\(\s*unknown\s*, \s*\d+\s*\)|\(\s*[^,]+\s*, \s*unknown\s*\)|\(\s*unknown\s*, \s*unknown\s*\)|\s*unknown\s*"
+            if not re.match(response_pattern, response, re.IGNORECASE):
                 reply += "Invalid response. Please try again using the format (location, size).\n"
                 return [reply], None
 
