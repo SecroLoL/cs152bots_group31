@@ -262,6 +262,10 @@ class Report:
             response = message.content.strip().lower()  # should be of form (location, size)
             
             # TODO: input validation here
+            response_pattern = r"\(\s*[^,]+\s*, \s*\d+\s*\)"
+            if not re.match(response_pattern, response) and response != "unknown":
+                reply += "Invalid response. Please try again using the format (location, size).\n"
+                return [reply], None
 
             # Assume that input is valid form of (location, size)
             split_input = response.split(",")
