@@ -64,6 +64,8 @@ class ModBot(discord.Client):
                 if channel.name == f'group-{self.group_num}-mod':
                     self.mod_channels[guild.id] = channel
         
+        print(self.mod_channels)
+        
 
     async def on_message(self, message):
         '''
@@ -120,7 +122,6 @@ class ModBot(discord.Client):
             threat_level = ""
             if classification.content[0].text == "Yes":
                 threat_level = "Threatening"
-              # This returns "Threatening" or "Non-Threatening"
             
             print(message.content)
 
@@ -135,8 +136,13 @@ class ModBot(discord.Client):
             # Add to automated review queue if threatening
             if threat_level == "Threatening":
                 self.to_be_reviewed_automated.append(report_data)
-            
-            print(self.to_be_reviewed_automated)
+                mod_channel = self.mod_channels.get(message.guild.id) 
+                if mod_channel:
+                    warning_message = f"Threat detected: {message.content}\nThreat Level: {threat_level}\nMessage ID: {message.id}\nAuthor: {message.author.name}\nChannel: {message.channel.name}"
+                    await mod_channel.send(warning_message)  # Send message using the channel object
+                else:
+                    print(f"No mod channel found for guild {message.guild.name}")
+
             
         if message.channel.name == f'group-{self.group_num}-mod':
             if message.content == ModReview.HELP_KEYWORD:
