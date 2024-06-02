@@ -8,12 +8,11 @@ import llm_prompt.constants as constants
 import anthropic
 
 
-
 def start_client():
 
     load_dotenv()
-
-    client = anthropic.Anthropic(  
+    
+    client = anthropic.Anthropic(
     )
     return client
 
@@ -65,7 +64,7 @@ def main():
                   prompt_prepend=constants.DEFAULT_CLASSIFICATION_PREP,
                   client=client)
     print(result)
-    return result.content[0].text
+    return result
 
 
 if __name__ == "__main__":
