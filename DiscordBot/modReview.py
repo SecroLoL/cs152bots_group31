@@ -16,6 +16,7 @@ class State(Enum):
 
 class ModReview:
     START_KEYWORD = "review"
+    START_AUTO_KEYWORD = "detected review"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
 
@@ -24,12 +25,14 @@ class ModReview:
         self.client = client
         self.message = None
         self.report_data = None
+        self.is_automated_review = False
 
     async def handle_message(self, message):
         if message.content == self.CANCEL_KEYWORD:
             return ["Review process has been terminated.", self.state_to_review_complete()]
 
         if message.content.startswith(self.START_KEYWORD):
+            self.is_automated_review = False
             if not self.client.to_be_reviewed:
                 return ["No more reports to review.", self.state_to_review_complete()]
 
@@ -57,6 +60,30 @@ class ModReview:
             )
             self.state = State.CHECK_URGENCY
             return [formatted_message]
+        
+        if message.content.startswith(self.START_AUTO_KEYWORD):
+            self.is_automated_review = True
+
+            if not self.client.to_be_reviewed_automated:
+                return ["No automated reports to review.", self.state_to_review_complete()]
+            
+            self.report_data = self.client.to_be_reviewed_automated.pop(0)
+            post_content = self.report_data["post_content"]
+            threat_level = self.report_data.get("threat_level", "Not specified")
+            author = self.report_data["author"]
+            channel = self.report_data["channel"]
+
+            formatted_message = (
+                f"**Reviewing Report:**\n\n"
+                f"**Author:** {author}\n"
+                f"**Channel:** {channel}\n"
+                f"**Threat Level:** {threat_level}\n\n"
+                f"**Content:**\n{post_content}\n\n"
+                f"Does this report represent an immediate threat? (yes/no)"
+            )
+            self.state = State.CHECK_URGENCY
+            return [formatted_message]
+
 
         if self.state == State.CHECK_URGENCY:
             if message.content.lower() == "yes":
@@ -93,9 +120,12 @@ class ModReview:
 
         if self.state == State.FINAL_DECISION:
             reply = ["Final review decisions have been made. The review process is now complete."]
-            if self.client.to_be_reviewed:
+            if self.is_automated_review and self.client.to_be_reviewed_automated:
+                reply.append("Do you want to review another automated report? (yes/no)")
+                self.state = State.REVIEW_START
+            elif not self.is_automated_review and self.client.to_be_reviewed:
                 reply.append("Do you want to review the next user report? (yes/no)")
-                self.state = State.REVIEW_START  # Reset to start to handle the next report
+                self.state = State.REVIEW_START
             else:
                 reply.append(self.state_to_review_complete())
             return reply

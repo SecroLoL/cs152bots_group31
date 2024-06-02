@@ -10,6 +10,10 @@ from report import Report
 from modReview import ModReview
 import pdb
 
+from llm_prompt.prompt_claude import start_client, prompt_claude
+import llm_prompt.constants as constants
+
+
 # Set up logging to the console
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -38,6 +42,8 @@ class ModBot(discord.Client):
         self.reviews = {} 
 
         self.to_be_reviewed = []
+        self.to_be_reviewed_automated = []
+        self.claudeClient = start_client()
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -107,6 +113,31 @@ class ModBot(discord.Client):
             self.reports.pop(author_id)
 
     async def handle_channel_message(self, message):
+        if message.channel.name == f'group-{self.group_num}':
+            messageText = message.content
+            classification = prompt_claude(constants.DEFAULT_MOD_CONTEXT, messageText, constants.DEFAULT_CLASSIFICATION_PREP, self.claudeClient)
+            print(classification.content[0].text)
+            threat_level = ""
+            if classification.content[0].text == "Yes":
+                threat_level = "Threatening"
+              # This returns "Threatening" or "Non-Threatening"
+            
+            print(message.content)
+
+            report_data = {
+                'post_content': message.content,
+                'threat_level': threat_level,
+                'message_id': message.id,
+                'author': message.author.name,
+                'channel': message.channel.name
+            }
+
+            # Add to automated review queue if threatening
+            if threat_level == "Threatening":
+                self.to_be_reviewed_automated.append(report_data)
+            
+            print(self.to_be_reviewed_automated)
+            
         if message.channel.name == f'group-{self.group_num}-mod':
             if message.content == ModReview.HELP_KEYWORD:
                 reply += "To initiate the reporting proccess, please type 'review' "
@@ -114,21 +145,20 @@ class ModBot(discord.Client):
                 await message.channel.send(reply)
             
             author_id = message.author.id
-            responses = []
-
-            if author_id not in self.reviews and not message.content.startswith(ModReview.START_KEYWORD):
-                return
-
             if author_id not in self.reviews:
-                self.reviews[author_id] = ModReview(self)
-            
+                if message.content.startswith(ModReview.START_KEYWORD) or message.content.startswith(ModReview.START_AUTO_KEYWORD):
+                    self.reviews[author_id] = ModReview(self)
+                else:
+                    return  # Exit if the message isn't a start command and the author has no active review
+
+            # Process the message through the corresponding ModReview instance
             responses = await self.reviews[author_id].handle_message(message)
+            for response in responses:
+                await message.channel.send(response)
 
-            for r in responses:
-                await message.channel.send(r)
-
-            if self.reports[author_id].report_complete():
-                self.reviews.pop(author_id)
+            # Clean up the review object if the review process is complete
+            if self.reviews[author_id].review_complete():
+                del self.reviews[author_id]
 
 
         # Only handle messages sent in the "group-#" channel
