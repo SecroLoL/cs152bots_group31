@@ -64,8 +64,6 @@ class ModBot(discord.Client):
                 if channel.name == f'group-{self.group_num}-mod':
                     self.mod_channels[guild.id] = channel
         
-        print(self.mod_channels)
-        
 
     async def on_message(self, message):
         '''
@@ -127,7 +125,6 @@ class ModBot(discord.Client):
 
             report_data = {
                 'post_content': message.content,
-                'threat_level': threat_level,
                 'message_id': message.id,
                 'author': message.author.name,
                 'channel': message.channel.name
@@ -138,7 +135,7 @@ class ModBot(discord.Client):
                 self.to_be_reviewed_automated.append(report_data)
                 mod_channel = self.mod_channels.get(message.guild.id) 
                 if mod_channel:
-                    warning_message = f"Threat detected: {message.content}\nThreat Level: {threat_level}\nMessage ID: {message.id}\nAuthor: {message.author.name}\nChannel: {message.channel.name}"
+                    warning_message = f"Threat detected: {message.content}\nMessage ID: {message.id}\nAuthor: {message.author.name}\nChannel: {message.channel.name}\n"
                     await mod_channel.send(warning_message)  # Send message using the channel object
                 else:
                     print(f"No mod channel found for guild {message.guild.name}")
@@ -152,7 +149,7 @@ class ModBot(discord.Client):
             
             author_id = message.author.id
             if author_id not in self.reviews:
-                if message.content.startswith(ModReview.START_KEYWORD) or message.content.startswith(ModReview.START_AUTO_KEYWORD):
+                if message.content.startswith(ModReview.START_KEYWORD) or message.content.startswith(ModReview.START_AUTO_KEYWORD) or message.content.startswith(ModReview.CLAUDE_REVIEW_KEYWORD) or message.content.startswith(ModReview.CLAUDE_AUTO_REVIEW_KEYWORD) :
                     self.reviews[author_id] = ModReview(self)
                 else:
                     return  # Exit if the message isn't a start command and the author has no active review

@@ -2,6 +2,9 @@ from enum import Enum, auto
 import discord
 import re
 
+from llm_prompt.prompt_claude import prompt_claude
+import llm_prompt.constants as constants
+
 class State(Enum):
     REVIEW_START = auto()
     REVIEW_COMPLETE = auto()
@@ -18,6 +21,8 @@ class ModReview:
     START_KEYWORD = "review"
     START_AUTO_KEYWORD = "detected review"
     CANCEL_KEYWORD = "cancel"
+    CLAUDE_REVIEW_KEYWORD = "automate review"
+    CLAUDE_AUTO_REVIEW_KEYWORD = "claude review"
     HELP_KEYWORD = "help"
 
     def __init__(self, client):
@@ -26,6 +31,7 @@ class ModReview:
         self.message = None
         self.report_data = None
         self.is_automated_review = False
+        self.is_claude_review = False
 
     async def handle_message(self, message):
         if message.content == self.CANCEL_KEYWORD:
@@ -83,6 +89,96 @@ class ModReview:
             )
             self.state = State.CHECK_URGENCY
             return [formatted_message]
+        
+        if message.content.startswith(self.CLAUDE_REVIEW_KEYWORD):
+             self.is_automated_review = False
+             self.is_claude_review = True
+
+             if not self.client.to_be_reviewed:
+                return ["No more reports to review.", self.state_to_review_complete()]
+             
+             self.report_data = self.client.to_be_reviewed.pop(0)
+             post_content = self.report_data["post_content"]
+             organization_name = self.report_data["organization_name"]
+             category = self.report_data["category"]
+             context = self.report_data["context"]
+             location = self.report_data["location"]
+             suspect = self.report_data["suspect"]
+             urgent = "Yes" if self.report_data["urgent"] else "No"
+             size = self.report_data["size"]
+
+             formatted_message = (
+                    f"**Reviewing Report:**\n\n"
+                    f"**Organization:** {organization_name or 'Unknown'}\n"
+                    f"**Category:** {category or 'Not Specified'}\n"
+                    f"**Context:** {context or 'No additional context provided'}\n"
+                    f"**Location:** {location or 'Location not specified'}\n"
+                    f"**Suspect:** {suspect or 'Suspect information not provided'}\n"
+                    f"**Urgency:** {urgent}\n"
+                    f"**Group Size:** {size or 'Not specified'}\n\n"
+                    f"**Content:**\n{post_content or 'No content provided'}\n"
+             )
+
+             prompt_prepend = "Review the report below and determine the necessary action based on the content's severity and implications. Choose the most appropriate response from the options provided. Answer 'Immediate threat', '1 day suspension', '7 days suspension', '30 days suspension', 'Indefinite suspension'. No explanation needed.\n\n"
+             
+             result = prompt_claude(moderator_context=constants.DEFAULT_MOD_CONTEXT,
+                input_message= formatted_message,
+                prompt_prepend=prompt_prepend,
+                client=self.client.claudeClient)
+             
+             resultText = result.content[0].text
+
+             if resultText == "Immediate threat":
+                return [f"Reviewing new report:\n{formatted_message}\nDecision: This has been flagged as an immediate threat. Report has been submitted to authorities. Thank you for your diligence.", self.state_to_review_complete()]
+             elif "suspension" in resultText:
+               days = re.findall(r'\d+|Indefinite', resultText)
+               if days[0] == "Indefinite":
+                    suspension_message = "User suspended indefinitely."
+               else:
+                    suspension_message = f"User suspended for {days[0]} days."
+
+               return [f"Reviewing new automated report:\n{formatted_message}\nDecision: No immediate threat detected. {suspension_message}", self.state_to_review_complete()]
+             
+        if message.content.startswith(self.CLAUDE_AUTO_REVIEW_KEYWORD):
+             self.is_automated_review = True
+             self.is_claude_review = True
+
+             if not self.client.to_be_reviewed_automated:
+                return ["No automated reports to review.", self.state_to_review_complete()]
+
+             self.report_data = self.client.to_be_reviewed_automated.pop(0)
+             post_content = self.report_data["post_content"]
+             author = self.report_data["author"]
+             channel = self.report_data["channel"]
+
+             formatted_message = (
+                f"**Reviewing Report:**\n\n"
+                f"**Author:** {author}\n"
+                f"**Channel:** {channel}\n"
+                f"**Content:**\n{post_content}\n"
+             )
+
+             prompt_prepend = "Review the report below and determine the necessary action based on the content's severity and implications. Choose the most appropriate response from the options provided. Answer 'Immediate threat', '1 day suspension', '7 days suspension', '30 days suspension', 'Indefinite suspension'. No explanation needed.\n\n"
+             
+             result = prompt_claude(moderator_context=constants.DEFAULT_MOD_CONTEXT,
+                input_message= formatted_message,
+                prompt_prepend=prompt_prepend,
+                client=self.client.claudeClient)
+            
+             resultText = result.content[0].text
+
+             if resultText == "Immediate threat":
+                return [f"Reviewing new automated report:\n{formatted_message}\nDecision: This has been flagged as an immediate threat. Report has been submitted to authorities. Thank you for your diligence.", self.state_to_review_complete()]
+             elif "suspension" in resultText:
+                days = re.findall(r'\d+|Indefinite', resultText)
+                if days[0] == "Indefinite":
+                    suspension_message = "User suspended indefinitely."
+                else:
+                    suspension_message = f"User suspended for {days[0]} days."
+
+                return [f"Reviewing new automated report:\n{formatted_message}\nDecision: No immediate threat detected. {suspension_message}", self.state_to_review_complete()]
+
+
 
 
         if self.state == State.CHECK_URGENCY:
@@ -120,11 +216,17 @@ class ModReview:
 
         if self.state == State.FINAL_DECISION:
             reply = ["Final review decisions have been made. The review process is now complete."]
-            if self.is_automated_review and self.client.to_be_reviewed_automated:
+            if self.is_automated_review and self.client.to_be_reviewed_automated and not self.is_claude_review:
                 reply.append("Do you want to review another automated report? (yes/no)")
                 self.state = State.REVIEW_START
-            elif not self.is_automated_review and self.client.to_be_reviewed:
+            elif not self.is_automated_review and self.client.to_be_reviewed and not self.is_claude_review:
                 reply.append("Do you want to review the next user report? (yes/no)")
+                self.state = State.REVIEW_START
+            elif self.is_automated_review and self.client.to_be_reviewed_automated and self.is_claude_review:
+                reply.append("Do you want to automatically review another automated report? (yes/no)")
+                self.state = State.REVIEW_START
+            elif not self.is_automated_review and self.client.to_be_reviewed and self.is_claude_review:
+                reply.append("Do you want to automatically review another user report? (yes/no)")
                 self.state = State.REVIEW_START
             else:
                 reply.append(self.state_to_review_complete())
