@@ -4,9 +4,12 @@ from dotenv import load_dotenv
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-import llm_prompt.constants as constants
-import anthropic
+import requests
+import json
+import src.constants as constants
 
+
+import anthropic
 
 def start_client():
 
